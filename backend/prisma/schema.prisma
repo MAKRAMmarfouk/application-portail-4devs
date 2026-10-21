@@ -1,0 +1,328 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique // SUPER_ADMIN, ERG_DIRECTOR, ERG_SECRETARY, ESTABLISHMENT_DIRECTOR, GROUPEMENT_RESPONSIBLE, GROUPEMENT_SECRETARY, COMPAGNIE_RESPONSIBLE, COMPAGNIE_SECRETARY, STUDENT
+  name        String
+  description String?
+  level       Int              @default(1)
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String?
+  module      String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id              String            @id @default(uuid())
+  email           String            @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  matricule       String?           @unique
+  phone           String?
+  roleId          String
+  role            Role              @relation(fields: [roleId], references: [id])
+  establishmentId String?
+  establishment   Establishment?    @relation(fields: [establishmentId], references: [id])
+  groupementId    String?
+  groupement      Groupement?       @relation(fields: [groupementId], references: [id])
+  compagnieId     String?
+  compagnie       Compagnie?        @relation(fields: [compagnieId], references: [id])
+  studentProfile  Student?
+  isActive        Boolean           @default(true)
+  lastLogin       DateTime?
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  requestActions  RequestHistory[]
+  gradesRecorded  Grade[]           @relation("GradeCreator")
+  gradesValidated Grade[]           @relation("GradeValidator")
+  gradeEdits      GradeHistory[]
+  absencesEntered Absence[]         @relation("AbsenceRecorder")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Establishment {
+  id          String                  @id @default(uuid())
+  code        String                  @unique // e.g. SIGR, CFGR, EFQGR
+  name        String
+  address     String?
+  phone       String?
+  email       String?
+  status      String                  @default("ACTIVE") // ACTIVE, INACTIVE
+  description String?
+  groupements Groupement[]
+  students    Student[]
+  users       User[]
+  requests    AdministrativeRequest[]
+  subjects    Subject[]
+  absences    Absence[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+model Groupement {
+  id              String                  @id @default(uuid())
+  name            String
+  code            String
+  establishmentId String
+  establishment   Establishment           @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  status          String                  @default("ACTIVE")
+  description     String?
+  compagnies      Compagnie[]
+  users           User[]
+  students        Student[]
+  requests        AdministrativeRequest[]
+  absences        Absence[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@unique([establishmentId, code])
+}
+
+model Compagnie {
+  id           String                  @id @default(uuid())
+  name         String
+  code         String
+  groupementId String
+  groupement   Groupement              @relation(fields: [groupementId], references: [id], onDelete: Cascade)
+  status       String                  @default("ACTIVE")
+  description  String?
+  students     Student[]
+  users        User[]
+  requests     AdministrativeRequest[]
+  absences     Absence[]
+  assessments  Assessment[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([groupementId, code])
+}
+
+model Student {
+  id              String                  @id @default(uuid())
+  matricule       String                  @unique
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?
+  placeOfBirth    String?
+  gender          String                  @default("M") // M, F
+  phone           String?
+  email           String?
+  address         String?
+  photoUrl        String?
+  status          String                  @default("ACTIF") // ACTIF, MALADE, DETACHE, EN_PERMISSION, EXCLU, RADIE, DIPLOME
+  promotionYear   String?                 @default("2026")
+  establishmentId String
+  establishment   Establishment           @relation(fields: [establishmentId], references: [id])
+  groupementId    String
+  groupement      Groupement              @relation(fields: [groupementId], references: [id])
+  compagnieId     String
+  compagnie       Compagnie               @relation(fields: [compagnieId], references: [id])
+  userId          String?                 @unique
+  user            User?                   @relation(fields: [userId], references: [id])
+  requests        AdministrativeRequest[]
+  absences        Absence[]
+  grades          Grade[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+}
+
+model RequestType {
+  id                    String                  @id @default(uuid())
+  code                  String                  @unique // DECLARATION, COMPTE_RENDU, PERMISSION, LIBERATION, RECLAMATION
+  name                  String
+  description           String?
+  requiresGeneralAdmin  Boolean                 @default(false)
+  requests              AdministrativeRequest[]
+  createdAt             DateTime                @default(now())
+}
+
+model AdministrativeRequest {
+  id                 String           @id @default(uuid())
+  trackingNumber     String           @unique // e.g. REQ-2026-0012
+  studentId          String
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  establishmentId    String
+  establishment      Establishment    @relation(fields: [establishmentId], references: [id])
+  groupementId       String
+  groupement         Groupement       @relation(fields: [groupementId], references: [id])
+  compagnieId        String
+  compagnie          Compagnie        @relation(fields: [compagnieId], references: [id])
+  requestTypeId      String
+  requestType        RequestType      @relation(fields: [requestTypeId], references: [id])
+  subject            String
+  content            String
+  startDate          DateTime?
+  endDate            DateTime?
+  destination        String?
+  status             String           @default("SOUMISE") 
+  // DRAFT, SOUMISE, RECUE_SECRETARIAT_COMPAGNIE, VALIDEE_COMPAGNIE, RECUE_SECRETARIAT_GROUPEMENT, VALIDEE_GROUPEMENT, VALIDEE_DIRECTION, TRANSMIS_ERG, VALIDEE_ERG, REFUSEE, RETOUR_CORRECTION, ANNULEE
+  currentStep        String           @default("SECRETARIAT_COMPAGNIE")
+  // SECRETARIAT_COMPAGNIE, RESPONSABLE_COMPAGNIE, SECRETARIAT_GROUPEMENT, RESPONSABLE_GROUPEMENT, DIRECTION_ECOLE, SECRETARIAT_ERG, DIRECTEUR_ERG, CLOTUREE
+  rejectionReason    String?
+  correctionNotes    String?
+  attachments        String?          // JSON metadata string for documents
+  history            RequestHistory[]
+  submittedAt        DateTime         @default(now())
+  closedAt           DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model RequestHistory {
+  id             String                @id @default(uuid())
+  requestId      String
+  request        AdministrativeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId        String
+  actor          User                  @relation(fields: [actorId], references: [id])
+  actorRole      String
+  action         String                // CREATION, TRANSMISSION, VALIDATION, REFUS, RETOUR, CLOTURE
+  previousStatus String?
+  newStatus      String
+  comments       String?
+  createdAt      DateTime              @default(now())
+}
+
+model Absence {
+  id              String        @id @default(uuid())
+  studentId       String
+  student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  establishmentId String
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  groupementId    String
+  groupement      Groupement    @relation(fields: [groupementId], references: [id])
+  compagnieId     String
+  compagnie       Compagnie     @relation(fields: [compagnieId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  durationHours   Int           @default(4)
+  type            String        @default("INJUSTIFIEE") // JUSTIFIEE, INJUSTIFIEE, MEDICALE, MISSION, PERMISSION
+  reason          String?
+  isJustified     Boolean       @default(false)
+  justification   String?
+  recordedById    String
+  recordedBy      User          @relation("AbsenceRecorder", fields: [recordedById], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Subject {
+  id              String        @id @default(uuid())
+  code            String
+  name            String
+  coefficient     Float         @default(1.0)
+  establishmentId String
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  assessments     Assessment[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([establishmentId, code])
+}
+
+model Assessment {
+  id          String    @id @default(uuid())
+  title       String
+  type        String    @default("CONTROLE") // EXAMEN, CONTROLE, TP, EPREUVE_SPORTIVE, DISCIPLINE
+  date        DateTime  @default(now())
+  maxScore    Float     @default(20.0)
+  coefficient Float     @default(1.0)
+  subjectId   String
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  compagnieId String
+  compagnie   Compagnie @relation(fields: [compagnieId], references: [id])
+  grades      Grade[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Grade {
+  id             String         @id @default(uuid())
+  assessmentId   String
+  assessment     Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score          Float
+  comments       String?
+  status         String         @default("SAISIE") // SAISIE, SOUMIS_VALIDATION, VALIDEE, PUBLIEE
+  createdById    String
+  createdBy      User           @relation("GradeCreator", fields: [createdById], references: [id])
+  validatedById  String?
+  validatedBy    User?          @relation("GradeValidator", fields: [validatedById], references: [id])
+  validatedAt    DateTime?
+  history        GradeHistory[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([assessmentId, studentId])
+}
+
+model GradeHistory {
+  id            String   @id @default(uuid())
+  gradeId       String
+  grade         Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  previousScore Float
+  newScore      Float
+  modifiedById  String
+  modifiedBy    User     @relation(fields: [modifiedById], references: [id])
+  reason        String
+  createdAt     DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, DANGER
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userRole  String?
+  action    String
+  module    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}

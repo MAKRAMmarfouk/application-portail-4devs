@@ -1,0 +1,24 @@
+{
+  "name": "ecoles-admin-plateforme",
+  "version": "1.0.0",
+  "description": "Application Web de Gestion Administrative des Écoles de Formation",
+  "scripts": {
+    "backend:dev": "npm --prefix backend run dev",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "prisma:seed": "npm --prefix backend run prisma:seed",
+    "prisma:push": "npm --prefix backend run prisma:push",
+    "test": "npm --prefix backend test",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+  },
+  "keywords": [
+    "gestion-administrative",
+    "ecoles-militaires",
+    "workflow",
+    "react",
+    "express",
+    "prisma",
+    "typescript"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "ISC"
+}
